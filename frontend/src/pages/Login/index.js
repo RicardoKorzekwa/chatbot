@@ -141,16 +141,16 @@ const Login = () => {
 						{i18n.t("login.buttons.submit")}
 					</Button>
 					<Grid container spacing={2}>
-				{/*	<Grid item xs={12}>
+				{	<Grid item xs={12}>
 						<Link
 						href="#"
 						variant="body2"
 						component={RouterLink}
 						to="/forgetpsw"
 						>
-						{i18n.t("Esqueci minha senha")}
+						{i18n.t("login.buttons.forgot")}
 						</Link>
-					</Grid>*/}
+					</Grid>}
 					<Grid item xs={12}>
 						<Link
 						href="#"
@@ -164,11 +164,22 @@ const Login = () => {
 					</Grid>
 
 				</form>
-			{/*	<IconButton color="primary"
-						onClick={() => openInNewTab(`https://wa.me/${process.env.REACT_APP_NUMBER_SUPPORT}`)}>
-						 <WhatsAppIcon style={{ color: "#25D366" }} />
+			{
+				<>
+					<IconButton 
+						color="primary"
+						onClick={() => openInNewTab(`https://wa.me/${process.env.REACT_APP_NUMBER_SUPPORT}`)}
+					>
+						<WhatsAppIcon style={{ color: "#25D366" }} />
 					</IconButton>
-			<Typography variant="caption" className={classes.supportText}><b>Fale com suporte</b></Typography>*/}
+					<Typography 
+						variant="caption" 
+						className={classes.supportText}
+					>
+						<b>Fale com suporte</b>
+					</Typography>
+				</>
+			}
 			</div>
 		</Container>
 		</div>

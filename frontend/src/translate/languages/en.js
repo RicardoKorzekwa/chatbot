@@ -26,6 +26,7 @@ const messages = {
 				buttons: {
 					submit: "Enter",
 					register: "Don't have an account? Register!",
+					forgot: "I forgot my password",
 				},
 			},
 			auth: {

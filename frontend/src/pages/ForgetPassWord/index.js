@@ -113,11 +113,12 @@ const handleSendEmail = async (values) => {
       `${process.env.REACT_APP_BACKEND_URL}/forgetpassword/${email}`
     );
     console.log("API Response:", response.data);
+    console.log("API Response:", response.data.status);
 
     if (response.data.status === 404) {
       toast.error("Email não encontrado");
     } else {
-      toast.success(i18n.t("Email não encontrado"));
+      toast.success(i18n.t("Email enviado"));
     }
   } catch (err) {
     console.log("API Error:", err);
