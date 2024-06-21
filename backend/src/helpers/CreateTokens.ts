@@ -1,13 +1,15 @@
 import { sign } from "jsonwebtoken";
 import authConfig from "../config/auth";
 import User from "../models/User";
+import { logger } from "../utils/logger";
+
 
 export const createAccessToken = (user: User): string => {
   const { secret, expiresIn } = authConfig;
 
   return sign(
     {
-      usarname: user.name,
+      username: user.name,
       profile: user.profile,
       id: user.id,
       companyId: user.companyId

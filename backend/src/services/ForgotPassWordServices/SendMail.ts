@@ -1,9 +1,9 @@
 import nodemailer from "nodemailer";
-import sequelize from "sequelize";
+import sequelize, { QueryTypes } from "sequelize";
 import database from "../../database";
 import Setting from "../../models/Setting";
 import { config } from 'dotenv';
-
+import { logger } from "../../utils/logger";
 
 config();
 
@@ -20,76 +20,83 @@ const companyPhone = process.env.COMPANY_PHONE; // Use a variável de ambiente
 
 interface UserData {
   companyId: number;
+  id: number;
+  email: string;
   // Outras propriedades que você obtém da consulta
 }
 
-const SendMail = async (email: string, tokenSenha: string) => {
-  // Verifique se o email existe no banco de dados
+const generateVerificationCode = (): string => {
+  return Math.floor(1000 + Math.random() * 9000).toString(); // Gera um código de 4 dígitos
+};
+
+const SendMail = async (email: string) => {
   const { hasResult, data } = await filterEmail(email);
 
   if (!hasResult) {
     return { status: 404, message: "Email não encontrado" };
   }
 
-  const userData = data[0][0] as UserData;
+  const userData = data[0] as UserData;
 
   if (!userData || userData.companyId === undefined) {
     return { status: 404, message: "Dados do usuário não encontrados" };
   }
 
-  const companyId = userData.companyId;
+  // Gera o código de verificação
+  const verificationCode = generateVerificationCode();
 
-  const urlSmtp = process.env.MAIL_HOST; // Use a variável de ambiente para o host SMTP
-  const userSmtp = process.env.MAIL_USER; // Use a variável de ambiente para o usuário SMTP
-  const passwordSmpt = process.env.MAIL_PASS; // Use a variável de ambiente para a senha SMTP
-  const fromEmail = process.env.MAIL_FROM; // Use a variável de ambiente para o email de origem
+  // Atualiza o usuário com o novo código de verificação
+  await updateVerificationCode(userData.id, verificationCode);
+
+  const urlSmtp = process.env.MAIL_HOST;
+  const userSmtp = process.env.MAIL_USER;
+  const passwordSmtp = process.env.MAIL_PASS;
+  const fromEmail = process.env.MAIL_FROM;
+
 
   const transporter = nodemailer.createTransport({
     host: urlSmtp,
-    port: Number(process.env.MAIL_PORT), // Use a variável de ambiente para a porta SMTP
-    secure: false, // O Gmail requer secure como false
+    port: Number(process.env.MAIL_PORT),
+    secure: true,
     auth: {
       user: userSmtp,
-      pass: passwordSmpt
+      pass: passwordSmtp
     }
   });
 
-  if (hasResult === true) {
-    const { hasResults, datas } = await insertToken(email, tokenSenha);
+  try {
+    const mailOptions = {
+      from: fromEmail,
+      to: email,
+      subject: `Redefinição de Senha - ${companyName}`,
+      text: `Olá,\n\nVocê solicitou a redefinição de senha para sua conta no ${companyName}. Utilize o seguinte Código de Verificação para concluir o processo de redefinição de senha:\n\nCódigo de Verificação: ${verificationCode}\n\nPor favor, copie e cole o Código de Verificação no campo 'Código de Verificação' na plataforma ${companyName}.\n\nSe você não solicitou esta redefinição de senha, por favor, ignore este e-mail.\n\n\nAtenciosamente,\nEquipe ${companyName}`
+    };
 
-    async function sendEmail() {
-      try {
-        const mailOptions = {
-          from: fromEmail,
-          to: email,
-          subject:  `Redefinição de Senha - ${companyName}`,
-          text: `Olá,\n\nVocê solicitou a redefinição de senha para sua conta no ${companyName}. Utilize o seguinte Código de Verificação para concluir o processo de redefinição de senha:\n\nCódigo de Verificação: ${tokenSenha}\n\nPor favor, copie e cole o Código de Verificação no campo 'Código de Verificação' na plataforma ${companyName}.\n\nSe você não solicitou esta redefinição de senha, por favor, ignore este e-mail.\n\n\nAtenciosamente,\nEquipe ${companyName}`
-        };
+    const info = await transporter.sendMail(mailOptions);
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log("E-mail enviado: " + info.response);
-      } catch (error) {
-        console.log(error);
-      }
-    }
-
-    sendEmail();
+    return { status: 200, message: "E-mail enviado" };
+  } catch (error) {
+    logger.error('Erro ao enviar o e-mail:', error);
+    return { status: 500, message: "Erro ao enviar o e-mail" };
   }
 };
 
-// Função para verificar se o email existe no banco de dados
 const filterEmail = async (email: string) => {
-  const sql = `SELECT * FROM "Users"  WHERE email ='${email}'`;
-  const result = await database.query(sql, { type: sequelize.QueryTypes.SELECT });
-  return { hasResult: result.length > 0, data: [result] };
+  const sql = 'SELECT * FROM "Users" WHERE email = :email';
+  const result = await database.query<UserData>(sql, {
+    replacements: { email },
+    type: QueryTypes.SELECT
+  });
+  return { hasResult: result.length > 0, data: result };
 };
 
-const insertToken = async (email: string, tokenSenha: string) => {
-  const sqls = `UPDATE "Users" SET "resetPassword"= '${tokenSenha}' WHERE email ='${email}'`;
-  const results = await database.query(sqls, { type: sequelize.QueryTypes.UPDATE });
-  return { hasResults: results.length > 0, datas: results };
+const updateVerificationCode = async (userId: number, verificationCode: string) => {
+  const sql = 'UPDATE "Users" SET "resetPassword" = :verificationCode WHERE id = :userId';
+  await database.query(sql, {
+    replacements: { userId, verificationCode },
+    type: QueryTypes.UPDATE
+  });
 };
 
-//export default SendMail;
-export { companyName,companyPhone,  SendMail };
+export { companyName, companyPhone, SendMail };
 

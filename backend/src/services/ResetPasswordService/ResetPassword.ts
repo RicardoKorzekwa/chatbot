@@ -1,48 +1,75 @@
-import sequelize from "sequelize";
+import sequelize, { QueryTypes, Sequelize } from "sequelize";
 import database from "../../database";
 import { hash } from "bcryptjs";
+import { logger } from "../../utils/logger";
 
-const ResetPassword = async (email: string ,token: string, password: string) => {
-    
-    const {hasResult , data} = await filterUser(email, token);
+const ResetPassword = async (email: string, verificationCode: string, password: string) => {
+  const { hasResult, data } = await filterUser(email, verificationCode);
 
-    if (!hasResult) {
-        return { status: 404, message: "Email não encontrado" };
+  if (!hasResult) {
+    return { status: 404, message: "Email ou código de verificação não encontrado" };
+  }
+
+  try {
+    const convertPassword: string = await hash(password, 8);
+    const { hasResults, affectedRows } = await updatePassword(email, verificationCode, convertPassword);
+
+    if (!hasResults) {
+      return { status: 404, message: "Código de verificação não encontrado" };
     }
 
-    if(hasResult === true){
-        try{
-        const convertPassword: string= await hash(password,8)
+    return { status: 200, message: "Senha redefinida com sucesso" };
+  } catch (err) {
+    logger.error("Erro ao redefinir senha:", err);
+    throw err; // Propaga o erro para que seja tratado pelo código que chama ResetPassword
+  }
+};
 
-        const {hasResults , datas} = await insertHasPassword(email, token ,convertPassword);
+const filterUser = async (email: string, verificationCode: string) => {
+  const sql = 'SELECT * FROM "Users" WHERE email = :email AND "resetPassword" = :verificationCode';
+  const sqll = 'SELECT * FROM "Users" WHERE email = :email';
 
-        if (datas.length === 0){
-            return { status: 404, message: "Token não encontrado" };
-        }
+  try {
+    // Consulta para verificar se há um usuário com o código de verificação específico
+    const result = await database.query(sql, {
+      replacements: { email, verificationCode },
+      type: QueryTypes.SELECT
+    });
 
-        }catch(err){
-            console.log(err)
-        }
-    }
+    // Verifica se há resultados na primeira consulta (com verificação de código)
+    const hasResult = result.length > 0;
 
-}
+    return { hasResult, data: result };
+
+  } catch (error) {
+    logger.error(`Error in filterUser function: ${error.message}`);
+    throw error;
+  }
+};
+
+
+const updatePassword = async (email: string, verificationCode: string, convertPassword: string) => {
+  const sql = 'UPDATE "Users" SET "passwordHash" = :convertPassword, "resetPassword" = \'\' WHERE email = :email AND "resetPassword" = :verificationCode';
+
+  try {
+    const result = await database.query(sql, {
+      replacements: { email, verificationCode, convertPassword },
+      type: QueryTypes.UPDATE
+    });
+
+    // Verificar se houve alguma linha afetada pela atualização
+    const affectedRows = result[1];
+    const hasResults = affectedRows > 0;
+
+    return { hasResults, affectedRows };
+
+  } catch (error) {
+    logger.error(`Error in updatePassword function: ${error.message}`);
+    throw error;
+  }
+};
+
+
 export default ResetPassword;
 
-const filterUser = async (email : string , token: string)=>{
-    const sql = `SELECT * FROM "Users"  WHERE email = '${email}' AND "resetPassword" != ''`;
-    const result = await database.query(sql, { type: sequelize.QueryTypes.SELECT });
-    return { hasResult: result.length > 0, data: result };
-}
-const insertHasPassword = async (email : string , token: string, convertPassword: string)=>{
 
-
-    const sqlValida = `SELECT * FROM "Users"  WHERE email = '${email}' AND "resetPassword" = '${token}'`;
-    const resultado = await database.query(sqlValida, { type: sequelize.QueryTypes.SELECT });
-
-
-    const sqls = `UPDATE  "Users"  SET "passwordHash"= '${convertPassword}' , "resetPassword" = '' WHERE email= '${email}' AND "resetPassword" = '${token}'`;
-    const results = await database.query(sqls, { type: sequelize.QueryTypes.UPDATE });
-
-
-    return { hasResults: results.length > 0, datas: resultado};
-}

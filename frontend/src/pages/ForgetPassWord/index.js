@@ -111,20 +111,20 @@ const handleSendEmail = async (values) => {
   try {
     const response = await api.post(
       `${process.env.REACT_APP_BACKEND_URL}/forgetpassword/${email}`
-    );
-    console.log("API Response:", response.data);
-    console.log("API Response:", response.data.status);
+    )
+    .then(res => {
+            toast.success(res.data.message);
+            toggleAdditionalFields();
 
-    if (response.data.status === 404) {
-      toast.error("Email não encontrado");
-    } else {
-      toast.success(i18n.t("Email enviado"));
-    }
+    })
+    .catch(e => toast.error('Email não enviado')) 
+
   } catch (err) {
     console.log("API Error:", err);
-    toastError(err);
+    toast.error('Email não enviado');
   }
 };
+
 
   const handleResetPassword = async (values) => {
     const email = values.email;
@@ -140,7 +140,8 @@ const handleSendEmail = async (values) => {
         setError(""); // Limpe o erro se não houver erro
         toast.success(i18n.t("Senha redefinida com sucesso."));
         history.push("/Login"); // Redireciona para a página de login
-        console.log("Redirecionado para a página de login após redefinição da senha");        
+        console.log("Redirecionado para a página de login após redefinição da senha"); 
+
       } catch (err) {
         console.log(err);
       }
@@ -200,7 +201,6 @@ const handleSendEmail = async (values) => {
                   handleSendEmail(values);
                 }
                 actions.setSubmitting(false);
-                toggleAdditionalFields();
               }, 400);
             }}
           >
